@@ -14,6 +14,37 @@ PLAYER_VEL = 5 #Speed in which char moves around the screen
 
 window = pygame.display.set_mode((WIDTH,HEIGHT)) #Creating game window
 
+#Player
+class Player(pygame.sprite.Sprite):
+    COLOR = (255, 0, 0)
+
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.x_vel = 0
+        self.y_vel = 0
+        self.mask = None
+        self.direction = "left"
+        self.animation_count = 0
+    
+    #Direction
+    def move(self, dx, dy):
+        self.rect.x += dx
+        self.rect.y += dy
+    
+    def move_left(self, vel):
+        self.x_vel = -vel
+        if self.direction != "left":
+            self.direction = "left"
+            self.animation_count = 0
+
+
+    def move_right(self, vel):
+        self.x_vel = vel
+        if self.direction != "right":
+            self.direction = "right"
+            self.animation_count = 0
+
+#Background
 def get_background(name):
     image = pygame.image.load(join("assets", "Background", name))
     _, _, width, height = image.get_rect() #The two _ will pull the information from the image
@@ -34,7 +65,7 @@ def draw(window, background, bg_image):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("Blue.png")
+    background, bg_image = get_background("Blue.png") #Can change the bg
 
     run = True
     while run:
