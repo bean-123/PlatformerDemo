@@ -22,5 +22,14 @@ def main(window):
     while run:
         clock.tick(FPS) #Requlating the FPS across diff devices
 
+        #Setting the quit event
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                break
+            
+    pygame.quit()
+    quit()
+
 if __name__ == "__main__":
     main(window)
