@@ -68,8 +68,19 @@ class Player(pygame.sprite.Sprite):
         self.direction = "left"
         self.animation_count = 0
         self.fall_count = 0
+        self.jump_count = 0
     
-    #Direction
+    #Jumping
+    def jump(self):
+        self.y_vel = -self.GRAVITY * 8
+        self.animation_count = 0
+        self.jump_count += 1
+        if self.jump_count == 1:
+            self.fall_count = 0 #On the first jump the gravity goes back to 0
+
+
+    
+    #Directions and actions
     def move(self, dx, dy):
         self.rect.x += dx
         self.rect.y += dy
@@ -88,14 +99,30 @@ class Player(pygame.sprite.Sprite):
             self.animation_count = 0
     
     def loop(self, fps):
-        #self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+        self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
         self.move(self.x_vel, self.y_vel)
 
         self.fall_count += 1
         self.update_sprite()
+
+    def landed(self):
+        self.fall_count = 0
+        self.y_vel = 0 #If we fall on a block stop moving
+        self.jump_count = 0
+    
+    def hit_head(self):
+        self.count = 0
+        self.y_vel *= -1 #When char hits head you bounce down off the block
     
     def update_sprite(self):
         sprite_sheet = "idle" #The default animation is idle
+        if self.y_vel < 0:
+            if self.jump_count == 1:
+                sprite_sheet = "jump"
+            elif self.jump_count == 2:
+                sprite_sheet = "double_jump"
+        elif self.y_vel > self.GRAVITY * 2:
+            sprite_sheet = "fall"
         if self.x_vel != 0:
             sprite_sheet = "run" #So obv if we are moving the animation is run
         
@@ -157,17 +184,33 @@ def draw(window, background, bg_image, player, objects):
 
     pygame.display.update()
 
+#Handling vertical collision
+def handle_vertical_collision(player, objects, dy):
+    collided_objects = []
+    for obj in objects:
+        if pygame.sprite.collide_mask(player, obj): #Determine if two obj r colliding
+            if dy > 0:
+                player.rect.bottom = obj.rect.top #If your char collides w obj top
+                player.landed()
+            elif dy < 0:
+                player.rect.top = obj.rect.bottom #If your char collides w obj bottom
+                player.hit_head()
+
+        collided_objects.append(obj)
+    
+    return collided_objects
+
 #Handling movement and keys
-def handle_move(player):
+def handle_move(player, objects):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0 #You need this so the char wont keep moving untill u press key again
-    #Moving to the left with A key
-    if keys[pygame.K_a]:
+    if keys[pygame.K_a]: #Moving to the left with A key
         player.move_left(PLAYER_VEL)
-    #Moving to the right with D key
-    if keys[pygame.K_d]:
+    if keys[pygame.K_d]: #Moving to the right with D key
         player.move_right(PLAYER_VEL)
+    
+    handle_vertical_collision(player, objects, player.y_vel)
 
 def main(window):
     clock = pygame.time.Clock()
@@ -177,6 +220,9 @@ def main(window):
 
     player = Player(100, 100, 50, 50)
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
+    
+    offset_x = 0
+    scroll_area_width = 200
 
     run = True
     while run:
@@ -187,10 +233,18 @@ def main(window):
             if event.type == pygame.QUIT:
                 run = False
                 break
+            
+            #Initializing jump, double jump
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and player.jump_count < 2:
+                    player.jump()
         
         player.loop(FPS)
-        handle_move(player)
+        handle_move(player, floor)
         draw(window, background, bg_image, player, floor)
+
+        if (player.rect.right - offset_x >= WIDTH - scroll_area_width and player.x_vel > 0):
+            offset_x += player.x_vel
 
     pygame.quit()
     quit()
