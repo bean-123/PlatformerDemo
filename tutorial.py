@@ -43,6 +43,12 @@ class Player(pygame.sprite.Sprite):
         if self.direction != "right":
             self.direction = "right"
             self.animation_count = 0
+    
+    def loop(self, fps):
+        self.move(self.x_vel, self.y_vel)
+    
+    def draw(self, win):
+        pygame.draw.rect(win, self.COLOR, self.rect)
 
 #Background
 def get_background(name):
@@ -57,15 +63,19 @@ def get_background(name):
             tiles.append(pos)
     return tiles, image
 
-def draw(window, background, bg_image):
+def draw(window, background, bg_image, player):
     for tile in background:
         window.blit(bg_image, tile)
+
+    player.draw(window)
 
     pygame.display.update()
 
 def main(window):
     clock = pygame.time.Clock()
     background, bg_image = get_background("Blue.png") #Can change the bg
+
+    player = Player(100, 100, 50, 50)
 
     run = True
     while run:
@@ -77,7 +87,7 @@ def main(window):
                 run = False
                 break
         
-        draw(window, background, bg_image)
+        draw(window, background, bg_image, player)
 
     pygame.quit()
     quit()
