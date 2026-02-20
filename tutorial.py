@@ -149,8 +149,8 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
         self.mask = pygame.mask.from_surface(self.sprite)
 
-    def draw(self, win, offset_x):
-        win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+    def draw(self, win, offset_x, offset_y):
+        win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y - offset_y))
 
 #Objects
 class Object(pygame.sprite.Sprite):
@@ -162,8 +162,8 @@ class Object(pygame.sprite.Sprite):
         self.height = height
         self.name = name
 
-    def draw(self, win, offset_x):
-        win.blit(self.image, (self.rect.x - offset_x, self.rect.y))
+    def draw(self, win, offset_x, offset_y):
+        win.blit(self.image, (self.rect.x - offset_x, self.rect.y - offset_y))
 
 class Block(Object):
     def __init__(self, x, y, size):
@@ -215,14 +215,14 @@ def get_background(name):
             tiles.append(pos)
     return tiles, image
 
-def draw(window, background, bg_image, player, objects, offset_x):
+def draw(window, background, bg_image, player, objects, offset_x, offset_y):
     for tile in background:
         window.blit(bg_image, tile)
     
     for obj in objects:
-        obj.draw(window, offset_x)
+        obj.draw(window, offset_x, offset_y)
 
-    player.draw(window, offset_x)
+    player.draw(window, offset_x, offset_y)
 
     pygame.display.update()
 
@@ -282,13 +282,16 @@ def main(window):
     block_size = 96
 
     player = Player(100, 100, 50, 50)
-    fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
-    fire.on()
+    fire1 = Fire(block_size * 4, HEIGHT - block_size * 1 - 64, 16, 32)
+    fire1.on()
+    fire2 = Fire(block_size * -5, HEIGHT - block_size * 4 - 64, 16, 32)
+    fire2.on()
+    fire3 = Fire(block_size * 8, HEIGHT - block_size * 6 - 64, 16, 32)
+    fire3.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
     #Here you can add blocks
     objects = [*floor, 
-               Block(0, HEIGHT - block_size * 2, block_size), 
-               fire,
+               Block(0, HEIGHT - block_size * 2, block_size),
                Block(block_size * -8, HEIGHT - block_size * 4, block_size),
                Block(block_size * -8, HEIGHT - block_size * 3, block_size),
                Block(block_size * -8, HEIGHT - block_size * 2, block_size),
@@ -311,10 +314,13 @@ def main(window):
                Block(block_size * -3, HEIGHT - block_size * 6, block_size),
                Block(block_size * -2, HEIGHT - block_size * 6, block_size),
                Block(block_size * -1, HEIGHT - block_size * 6, block_size),
+               fire1, fire2, fire3,
                ]
 
     offset_x = 0
+    offset_y = 0
     scroll_area_width = 200
+    scroll_area_height = 200
 
     run = True
     while run:
@@ -332,14 +338,24 @@ def main(window):
                     player.jump()
         
         player.loop(FPS)
-        fire.loop()
+        fire1.loop()
+        fire2.loop()
+        fire3.loop()
         handle_move(player, objects)
-        draw(window, background, bg_image, player, objects, offset_x)
+        draw(window, background, bg_image, player, objects, offset_x, offset_y)
 
-        #Defining background movement
+        #Defining background movement horizontal
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+        
+        # Vertical scrolling
+        if ((player.rect.bottom - offset_y >= HEIGHT - scroll_area_height) and player.y_vel > 0) or (
+            (player.rect.top - offset_y <= scroll_area_height) and player.y_vel < 0):
+            offset_y += player.y_vel
+
+        #Verical wont go below the floor
+        offset_y = min(offset_y, 0)
 
     pygame.quit()
     quit()
