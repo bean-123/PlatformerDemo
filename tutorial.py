@@ -72,6 +72,42 @@ def get_block(size):
     surface.blit(image, (0, 0), rect)
     return pygame.transform.scale2x(surface) #You can adjust the size here: return pygame.transform.scale(surface, (size * 2, size * 2))
 
+class HeightTracker:
+    def __init__(self):
+        self.current_height = 0
+        self.session_best = 0   # resets on death
+        self.all_time_best = 0  # never resets
+        self.font = pygame.font.SysFont("Arial", 12)
+        self.small_font = pygame.font.SysFont("Arial", 12)
+
+    def update(self, player_y, block_size):
+        # Floor is at HEIGHT - block_size, so height in blocks from floor
+        floor_y = HEIGHT - block_size
+        self.current_height = max(0, (floor_y - player_y) // block_size)
+
+        if self.current_height > self.session_best:
+            self.session_best = self.current_height
+        if self.current_height > self.all_time_best:
+            self.all_time_best = self.current_height
+
+    def reset_session(self):
+        self.current_height = 0
+        self.session_best = 0
+        # all_time_best intentionally not reset
+
+    def draw(self, window):
+        padding = 10
+        
+        all_time_text = self.font.render(f"All time best: {self.all_time_best} blocks", True, (0, 0, 0))
+        session_text = self.font.render(f"Session best: {self.session_best} blocks", True, (0, 0, 0))
+        current_text = self.small_font.render(f"Current height: {self.current_height} blocks", True, (0, 0, 0))
+
+        x = WIDTH - max(all_time_text.get_width(), session_text.get_width(), current_text.get_width()) - padding * 2
+
+        window.blit(all_time_text, (x, 15))
+        window.blit(session_text, (x, 45))
+        window.blit(current_text, (x, 72))
+
 #Player/Sprite
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
@@ -265,7 +301,7 @@ def get_background(name):
             tiles.append(pos)
     return tiles, image
 
-def draw(window, background, bg_image, player, objects, offset_x, offset_y, health):
+def draw(window, background, bg_image, player, objects, offset_x, offset_y, health, height_tracker):
     for tile in background:
         window.blit(bg_image, tile)
     
@@ -273,6 +309,7 @@ def draw(window, background, bg_image, player, objects, offset_x, offset_y, heal
         obj.draw(window, offset_x, offset_y)
     player.draw(window, offset_x, offset_y)
     health.draw(window)
+    height_tracker.draw(window)
 
     pygame.display.update()
 
@@ -327,10 +364,15 @@ def handle_move(player, objects, health):
                 player.make_hit()
                 health.take_damage()
 
-def main(window):
+def main(window, height_tracker=None):
     clock = pygame.time.Clock()
     background, bg_image = get_background("Blue.png") #Can change the bg
     block_size = 96
+
+    if height_tracker is None:
+        height_tracker = HeightTracker()
+    else:
+        height_tracker.reset_session()  # only reset session, keep all time best
 
     player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) #Starting position
     health = Health()
@@ -399,20 +441,21 @@ def main(window):
                     player.jump()
         
         player.loop(FPS)
-        fire1.loop()
-        fire2.loop()
-        fire3.loop()
-        fire4.loop()
         handle_move(player, objects, health)
-        draw(window, background, bg_image, player, objects, offset_x, offset_y, health)
+        height_tracker.update(player.rect.y, block_size)
+        draw(window, background, bg_image, player, objects, offset_x, offset_y, health, height_tracker)
 
         #Defining background movement horizontal
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+
+        for obj in objects:
+            if hasattr(obj, 'loop'):
+                obj.loop()
         
         if health.is_dead():
-            main(window)
+            main(window, height_tracker)
             return
         
         # Vertical scrolling
