@@ -316,6 +316,9 @@ def draw_background(window, offset_y, block_size):
         b = int(top_color[2] + (bottom_color[2] - top_color[2]) * t)
         pygame.draw.line(window, (r, g, b), (0, y), (WIDTH, y))
 
+# Make a Forest to lvl 0-25
+#def draw_forest(window, offset_x, offset_y, height_blocks):
+
 def draw(window, player, objects, offset_x, offset_y, health, height_tracker, stars):
     height_blocks = -offset_y // 96
     draw_background(window, offset_y, 96)
