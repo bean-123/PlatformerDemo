@@ -33,7 +33,7 @@ def load_sprite_sheets(dir1, dir2, width, height, direction=False):
             surface = pygame.Surface((width, height), pygame.SRCALPHA, 32)
             rect = pygame.Rect(i * width, 0, width, height)
             surface.blit(sprite_sheet, (0, 0), rect)
-            sprites.append(pygame.transform.scale2x(surface)) #Making the sprites larger
+            sprites.append(pygame.transform.scale2x(surface)) #Making the sprites larger, you can adjust the size: sprites.append(pygame.transform.scale(surface, (48, 48))), just update player at bottom
 
         #Defining the direction of sprites, all sprites are to the right, the once on left r flipped
         if direction:
@@ -70,7 +70,7 @@ def get_block(size):
     surface = pygame.Surface((size, size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(96, 0, size, size) #Adjust this if u change image
     surface.blit(image, (0, 0), rect)
-    return pygame.transform.scale2x(surface)
+    return pygame.transform.scale2x(surface) #You can adjust the size here: return pygame.transform.scale(surface, (size * 2, size * 2))
 
 #Player/Sprite
 class Player(pygame.sprite.Sprite):
@@ -172,7 +172,7 @@ class Player(pygame.sprite.Sprite):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y - offset_y))
 
 class Health:
-    MAX_HEALTH = 10  # 10 hits total (5 hearts x 2 halves)
+    MAX_HEALTH = 10  #10 hits total (5 hearts x 2 halves)
 
     def __init__(self):
         self.health = self.MAX_HEALTH
@@ -193,7 +193,7 @@ class Health:
         y = 20
 
         for i in range(total_hearts):
-            heart_health = self.health - i * 2  # Each heart = 2 hit points
+            heart_health = self.health - i * 2  #Each heart = 2 hit points
             if heart_health >= 2:
                 img = self.heart_full
             elif heart_health == 1:
@@ -332,42 +332,50 @@ def main(window):
     background, bg_image = get_background("Blue.png") #Can change the bg
     block_size = 96
 
-    player = Player(100, 100, 50, 50)
+    player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) #Starting position
     health = Health()
 
-    fire1 = Fire(block_size * 4, HEIGHT - block_size * 1 - 64, 16, 32)
+    fire1 = Fire(block_size * 1, HEIGHT - block_size * 1 - 64, 16, 32)
     fire1.on()
-    fire2 = Fire(block_size * -5, HEIGHT - block_size * 4 - 64, 16, 32)
+    fire2 = Fire(block_size * 2, HEIGHT - block_size * 1 - 64, 16, 32)
     fire2.on()
-    fire3 = Fire(block_size * 8, HEIGHT - block_size * 6 - 64, 16, 32)
+    fire3 = Fire(block_size * 9, HEIGHT - block_size * 1 - 64, 16, 32)
     fire3.on()
+    fire4 = Fire(block_size * 8, HEIGHT - block_size * 1 - 64, 16, 32)
+    fire4.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
     #Here you can add blocks
     objects = [*floor, 
-               Block(0, HEIGHT - block_size * 2, block_size),
-               Block(block_size * -8, HEIGHT - block_size * 4, block_size),
-               Block(block_size * -8, HEIGHT - block_size * 3, block_size),
-               Block(block_size * -8, HEIGHT - block_size * 2, block_size),
-               Block(block_size * -8, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 13, HEIGHT - block_size * 4, block_size),
-               Block(block_size * 13, HEIGHT - block_size * 3, block_size),
-               Block(block_size * 13, HEIGHT - block_size * 2, block_size),
-               Block(block_size * 13, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 3, HEIGHT - block_size * 4, block_size),
-               Block(block_size * 4, HEIGHT - block_size * 4, block_size),
-               Block(block_size * 5, HEIGHT - block_size * 4, block_size),
-               Block(block_size * 6, HEIGHT - block_size * 4, block_size),
-               Block(block_size * 8, HEIGHT - block_size * 6, block_size),
-               Block(block_size * 7, HEIGHT - block_size * 6, block_size),
-               Block(block_size * 6, HEIGHT - block_size * 6, block_size),
-               Block(block_size * 5, HEIGHT - block_size * 6, block_size),
-               Block(block_size * -3, HEIGHT - block_size * 4, block_size),
-               Block(block_size * -4, HEIGHT - block_size * 4, block_size),
-               Block(block_size * -5, HEIGHT - block_size * 4, block_size),
-               Block(block_size * -3, HEIGHT - block_size * 6, block_size),
-               Block(block_size * -2, HEIGHT - block_size * 6, block_size),
-               Block(block_size * -1, HEIGHT - block_size * 6, block_size),
-               fire1, fire2, fire3,
+               #Block(block_size * 5, HEIGHT - block_size * 2, block_size), MIDDLE
+               Block(block_size * 3, HEIGHT - block_size * 3, block_size),
+               Block(block_size * 7, HEIGHT - block_size * 3, block_size),
+               Block(block_size * 5, HEIGHT - block_size * 5, block_size),
+               Block(block_size * 6, HEIGHT - block_size * 5, block_size),
+               Block(block_size * 4, HEIGHT - block_size * 5, block_size),
+               Block(block_size * 3, HEIGHT - block_size * 5, block_size),
+               Block(block_size * 7, HEIGHT - block_size * 5, block_size),
+               Block(block_size * 9, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 10, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 11, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 12, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 1, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 0, HEIGHT - block_size * 7, block_size),
+               Block(block_size * -1, HEIGHT - block_size * 7, block_size),
+               Block(block_size * -2, HEIGHT - block_size * 7, block_size),
+               Block(block_size * 5, HEIGHT - block_size * 9, block_size),
+               Block(block_size * 1, HEIGHT - block_size * 11, block_size),
+               Block(block_size * 0, HEIGHT - block_size * 11, block_size),
+               Block(block_size * -1, HEIGHT - block_size * 11, block_size),
+               Block(block_size * 9, HEIGHT - block_size * 11, block_size),
+               Block(block_size * 10, HEIGHT - block_size * 11, block_size),
+               Block(block_size * 11, HEIGHT - block_size * 11, block_size),
+               Block(block_size * 5, HEIGHT - block_size * 14, block_size),
+               Block(block_size * 4, HEIGHT - block_size * 14, block_size),
+               Block(block_size * 6, HEIGHT - block_size * 14, block_size),
+               Block(block_size * 3, HEIGHT - block_size * 13, block_size),
+               Block(block_size * 7, HEIGHT - block_size * 13, block_size),
+
+               fire1, fire2, fire3, fire4,
                ]
 
     offset_x = 0
@@ -394,6 +402,7 @@ def main(window):
         fire1.loop()
         fire2.loop()
         fire3.loop()
+        fire4.loop()
         handle_move(player, objects, health)
         draw(window, background, bg_image, player, objects, offset_x, offset_y, health)
 
