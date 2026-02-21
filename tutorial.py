@@ -75,38 +75,30 @@ def get_block(size):
 class HeightTracker:
     def __init__(self):
         self.current_height = 0
-        self.session_best = 0   # resets on death
         self.all_time_best = 0  # never resets
-        self.font = pygame.font.SysFont("Arial", 12)
-        self.small_font = pygame.font.SysFont("Arial", 12)
+        self.font = pygame.font.SysFont("Arial", 12, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 12, bold=True)
 
     def update(self, player_y, block_size):
-        # Floor is at HEIGHT - block_size, so height in blocks from floor
         floor_y = HEIGHT - block_size
         self.current_height = max(0, (floor_y - player_y) // block_size)
-
-        if self.current_height > self.session_best:
-            self.session_best = self.current_height
         if self.current_height > self.all_time_best:
             self.all_time_best = self.current_height
 
     def reset_session(self):
         self.current_height = 0
-        self.session_best = 0
-        # all_time_best intentionally not reset
 
     def draw(self, window):
         padding = 10
         
-        all_time_text = self.font.render(f"All time best: {self.all_time_best} blocks", True, (0, 0, 0))
-        session_text = self.font.render(f"Session best: {self.session_best} blocks", True, (0, 0, 0))
+        all_time_text = self.font.render(f"Best height: {self.all_time_best} blocks", True, (0, 0, 0))
         current_text = self.small_font.render(f"Current height: {self.current_height} blocks", True, (0, 0, 0))
 
-        x = WIDTH - max(all_time_text.get_width(), session_text.get_width(), current_text.get_width()) - padding * 2
+        x = WIDTH - max(all_time_text.get_width(), current_text.get_width()) - padding * 2
 
+        #Position of the text
         window.blit(all_time_text, (x, 15))
-        window.blit(session_text, (x, 45))
-        window.blit(current_text, (x, 72))
+        window.blit(current_text, (x, 35))
 
 #Player/Sprite
 class Player(pygame.sprite.Sprite):
@@ -177,7 +169,7 @@ class Player(pygame.sprite.Sprite):
     
     def hit_head(self):
         self.count = 0
-        self.y_vel *= -1 #When char hits head you bounce down off the block
+        self.y_vel = abs(self.y_vel) * 0.5
     
     def update_sprite(self):
         sprite_sheet = "idle" #The default animation is idle
@@ -322,8 +314,13 @@ def handle_vertical_collision(player, objects, dy):
                 player.rect.bottom = obj.rect.top #If your char collides w obj top
                 player.landed()
             elif dy < 0:
-                player.rect.top = obj.rect.bottom #If your char collides w obj bottom
-                player.hit_head()
+                # Only snap to bottom if player is actually below the block
+                # not just grazing the side of it
+                if player.rect.centerx > obj.rect.left and player.rect.centerx < obj.rect.right:
+                    player.rect.top = obj.rect.bottom + 1
+                    player.hit_head()
+                else:
+                    continue  # ignore, it's a side graze not a real head hit!
 
             collided_objects.append(obj)
     
@@ -364,6 +361,53 @@ def handle_move(player, objects, health):
                 player.make_hit()
                 health.take_damage()
 
+#Generate automated random platforms
+def generate_next_platform(block_size, current_height, screen_width_blocks, last_pos):
+    positions = ["left", "middle", "right", "middle"]
+    section_index = (current_height - 3) // 2  # convert height to section number
+    pos = positions[section_index % len(positions)]
+    new_blocks = []
+
+    if pos == "left":
+        starts = [-1, 0, 1]
+        length = random.randint(2, 4)
+        start = random.choice(starts)
+        for j in range(length):
+            new_blocks.append(Block(block_size * (start + j), HEIGHT - block_size * current_height, block_size))
+
+    elif pos == "middle":
+        center = screen_width_blocks // 2
+        length = random.randint(1, 3)
+        start = center - 1
+        for j in range(length):
+            new_blocks.append(Block(block_size * (start + j), HEIGHT - block_size * current_height, block_size))
+
+    elif pos == "right":
+        starts = [screen_width_blocks - 4, screen_width_blocks - 3]
+        length = random.randint(2, 4)
+        start = random.choice(starts)
+        for j in range(length):
+            new_blocks.append(Block(block_size * (start + j), HEIGHT - block_size * current_height, block_size))
+
+    # Fire check
+    if len(new_blocks) >= 3 and random.random() < 0.2:
+        middle_block = new_blocks[len(new_blocks) // 2]
+        
+        # Check no block exists directly above the fire position
+        fire_x = middle_block.rect.x
+        fire_y = HEIGHT - block_size * current_height - block_size  # one block above
+        block_above = any(
+            isinstance(p, Block) and p.rect.x == fire_x and p.rect.y == fire_y
+            for p in new_blocks
+        )
+        
+        if not block_above:
+            fire = Fire(fire_x, HEIGHT - block_size * current_height - 64, 16, 32)
+            fire.on()
+            new_blocks.append(fire)
+
+    return new_blocks
+
 def main(window, height_tracker=None):
     clock = pygame.time.Clock()
     background, bg_image = get_background("Blue.png") #Can change the bg
@@ -377,48 +421,10 @@ def main(window, height_tracker=None):
     player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) #Starting position
     health = Health()
 
-    fire1 = Fire(block_size * 1, HEIGHT - block_size * 1 - 64, 16, 32)
-    fire1.on()
-    fire2 = Fire(block_size * 2, HEIGHT - block_size * 1 - 64, 16, 32)
-    fire2.on()
-    fire3 = Fire(block_size * 9, HEIGHT - block_size * 1 - 64, 16, 32)
-    fire3.on()
-    fire4 = Fire(block_size * 8, HEIGHT - block_size * 1 - 64, 16, 32)
-    fire4.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
-    #Here you can add blocks
-    objects = [*floor, 
-               #Block(block_size * 5, HEIGHT - block_size * 2, block_size), MIDDLE
-               Block(block_size * 3, HEIGHT - block_size * 3, block_size),
-               Block(block_size * 7, HEIGHT - block_size * 3, block_size),
-               Block(block_size * 5, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 6, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 4, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 3, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 7, HEIGHT - block_size * 5, block_size),
-               Block(block_size * 9, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 10, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 11, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 12, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 1, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 0, HEIGHT - block_size * 7, block_size),
-               Block(block_size * -1, HEIGHT - block_size * 7, block_size),
-               Block(block_size * -2, HEIGHT - block_size * 7, block_size),
-               Block(block_size * 5, HEIGHT - block_size * 9, block_size),
-               Block(block_size * 1, HEIGHT - block_size * 11, block_size),
-               Block(block_size * 0, HEIGHT - block_size * 11, block_size),
-               Block(block_size * -1, HEIGHT - block_size * 11, block_size),
-               Block(block_size * 9, HEIGHT - block_size * 11, block_size),
-               Block(block_size * 10, HEIGHT - block_size * 11, block_size),
-               Block(block_size * 11, HEIGHT - block_size * 11, block_size),
-               Block(block_size * 5, HEIGHT - block_size * 14, block_size),
-               Block(block_size * 4, HEIGHT - block_size * 14, block_size),
-               Block(block_size * 6, HEIGHT - block_size * 14, block_size),
-               Block(block_size * 3, HEIGHT - block_size * 13, block_size),
-               Block(block_size * 7, HEIGHT - block_size * 13, block_size),
-
-               fire1, fire2, fire3, fire4,
-               ]
+    platforms = []
+    generated_height = 3
+    objects = [*floor]
 
     offset_x = 0
     offset_y = 0
@@ -439,7 +445,15 @@ def main(window, height_tracker=None):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
-        
+
+        # Generate more platforms as player climbs
+        player_height_blocks = (HEIGHT - player.rect.y) // block_size
+        if player_height_blocks + 10 > generated_height:  # stay 10 blocks ahead
+            new_platform = generate_next_platform(block_size, generated_height, WIDTH // block_size, None)
+            platforms.extend(new_platform)
+            objects.extend(new_platform)
+            generated_height += 2        
+
         player.loop(FPS)
         handle_move(player, objects, health)
         height_tracker.update(player.rect.y, block_size)
