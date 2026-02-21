@@ -44,6 +44,25 @@ def load_sprite_sheets(dir1, dir2, width, height, direction=False):
 
     return all_sprites
 
+def get_heart_images():
+    size = (40, 40)
+    
+    def make_heart(fill_color, half=False):
+        surf = pygame.Surface(size, pygame.SRCALPHA)
+        # Draw a simple heart using circles and a polygon
+        color = fill_color
+        pygame.draw.circle(surf, color, (12, 14), 10)
+        pygame.draw.circle(surf, color, (28, 14), 10)
+        pygame.draw.polygon(surf, color, [(2, 18), (20, 38), (38, 18)])
+        if half:  # Cover right half with transparent
+            pygame.draw.rect(surf, (0,0,0,0), (20, 0, 20, 40))
+        return surf
+
+    full = make_heart((220, 20, 60))
+    half_h = make_heart((220, 20, 60), half=True)
+    empty = make_heart((100, 100, 100))
+    return full, half_h, empty
+
 #Loading the Terrain Block from assets, can change the image on path
 def get_block(size):
     path = join("assets", "Terrain", "Terrain.png")
@@ -149,8 +168,39 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
         self.mask = pygame.mask.from_surface(self.sprite)
 
-    def draw(self, win, offset_x, offset_y):
+    def draw(self, win, offset_x, offset_y,):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y - offset_y))
+
+class Health:
+    MAX_HEALTH = 10  # 10 hits total (5 hearts x 2 halves)
+
+    def __init__(self):
+        self.health = self.MAX_HEALTH
+        self.heart_full, self.heart_half, self.heart_empty = get_heart_images()
+
+    def take_damage(self):
+        self.health = max(0, self.health - 1)
+
+    def is_dead(self):
+        return self.health <= 0
+
+    def draw(self, window):
+        total_hearts = 5
+        heart_width = 40
+        spacing = 10
+        total_width = total_hearts * heart_width + (total_hearts - 1) * spacing
+        start_x = (WIDTH - total_width) // 2
+        y = 20
+
+        for i in range(total_hearts):
+            heart_health = self.health - i * 2  # Each heart = 2 hit points
+            if heart_health >= 2:
+                img = self.heart_full
+            elif heart_health == 1:
+                img = self.heart_half
+            else:
+                img = self.heart_empty
+            window.blit(img, (start_x + i * (heart_width + spacing), y))
 
 #Objects
 class Object(pygame.sprite.Sprite):
@@ -215,14 +265,14 @@ def get_background(name):
             tiles.append(pos)
     return tiles, image
 
-def draw(window, background, bg_image, player, objects, offset_x, offset_y):
+def draw(window, background, bg_image, player, objects, offset_x, offset_y, health):
     for tile in background:
         window.blit(bg_image, tile)
     
     for obj in objects:
         obj.draw(window, offset_x, offset_y)
-
     player.draw(window, offset_x, offset_y)
+    health.draw(window)
 
     pygame.display.update()
 
@@ -257,7 +307,7 @@ def collide(player, objects, dx):
     return collided_object
 
 #Handling movement and keys
-def handle_move(player, objects):
+def handle_move(player, objects, health):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0 #You need this so the char wont keep moving untill u press key again
@@ -273,15 +323,18 @@ def handle_move(player, objects):
     to_check = [collide_left, collide_right, *vertical_collide]
     for obj in to_check:
         if obj and obj.name == "fire":
-            player.make_hit()
+            if not player.hit:  # Only take damage if not in hit cooldown
+                player.make_hit()
+                health.take_damage()
 
 def main(window):
     clock = pygame.time.Clock()
     background, bg_image = get_background("Blue.png") #Can change the bg
-
     block_size = 96
 
     player = Player(100, 100, 50, 50)
+    health = Health()
+
     fire1 = Fire(block_size * 4, HEIGHT - block_size * 1 - 64, 16, 32)
     fire1.on()
     fire2 = Fire(block_size * -5, HEIGHT - block_size * 4 - 64, 16, 32)
@@ -341,13 +394,17 @@ def main(window):
         fire1.loop()
         fire2.loop()
         fire3.loop()
-        handle_move(player, objects)
-        draw(window, background, bg_image, player, objects, offset_x, offset_y)
+        handle_move(player, objects, health)
+        draw(window, background, bg_image, player, objects, offset_x, offset_y, health)
 
         #Defining background movement horizontal
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+        
+        if health.is_dead():
+            main(window)
+            return
         
         # Vertical scrolling
         if ((player.rect.bottom - offset_y >= HEIGHT - scroll_area_height) and player.y_vel > 0) or (
