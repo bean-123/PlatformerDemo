@@ -439,17 +439,18 @@ def draw_stars(window, stars, offset_y, height_blocks):
     tick = pygame.time.get_ticks()
 
     for (x, base_y, size, twinkle) in stars:
-        # Parallax: stars move down slowly as offset_y goes more negative
-        # Multiply by small factor so they don't move 1:1 with the world
-        screen_y = base_y + (offset_y * 0.05)  # 0.05 = slow subtle drift downward
-        screen_y = screen_y % HEIGHT  # wrap around screen so stars always visible
+        screen_y = base_y - (offset_y * 0.2) # 0.0 doesnt move, 0.05 barely moves and 0.1 moves faster
+        screen_y = screen_y % HEIGHT # wrap around screen so stars always visible
 
-        brightness = int(180 + 75 * math.sin(tick / 500 + twinkle * 10))
+        brightness = int(180 + 120 * math.sin(tick / 200 + twinkle * 10))
+        #                       ^^^faster range        ^^^faster speed
         brightness = int(brightness * opacity)
         brightness = max(0, min(255, brightness))
-        r = brightness
-        g = brightness
-        b = int(brightness * 0.4)
+
+        r = min(255, brightness + 20) # always push red high
+        g = min(255, brightness + 55) # always push green high  
+        b = int(brightness * 0.3) # blue low = yellow tint
+
         pygame.draw.circle(window, (r, g, b), (x, int(screen_y)), size)
 
 def main(window, height_tracker=None):
@@ -459,9 +460,9 @@ def main(window, height_tracker=None):
     if height_tracker is None:
         height_tracker = HeightTracker()
     else:
-        height_tracker.reset_session()  # only reset session, keep all time best
+        height_tracker.reset_session() # only reset session, keep all time best
 
-    player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) #Starting position
+    player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) # Starting position
     health = Health()
 
     # Generate stars spread across the climbing range
@@ -508,7 +509,7 @@ def main(window, height_tracker=None):
 
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
     platforms = []
-    generated_height = 16  # start generating above my designed blocks
+    generated_height = 16 # start generating above my designed blocks
     objects = [*floor, *preset_platforms]
 
     offset_x = 0
