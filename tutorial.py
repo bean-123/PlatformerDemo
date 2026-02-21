@@ -91,8 +91,8 @@ class HeightTracker:
     def draw(self, window):
         padding = 10
         
-        all_time_text = self.font.render(f"Best height: {self.all_time_best} blocks", True, (0, 0, 0))
-        current_text = self.small_font.render(f"Current height: {self.current_height} blocks", True, (0, 0, 0))
+        all_time_text = self.font.render(f"Best height: {self.all_time_best} blocks", True, (255, 255, 255))
+        current_text = self.small_font.render(f"Current height: {self.current_height} blocks", True, (255, 255, 255))
 
         x = WIDTH - max(all_time_text.get_width(), current_text.get_width()) - padding * 2
 
@@ -281,28 +281,50 @@ class Fire(Object):
             self.animation_count = 0
 
 #Background
-def get_background(name):
-    image = pygame.image.load(join("assets", "Background", name))
-    _, _, width, height = image.get_rect() #The two _ will pull the information from the image
-    tiles = []
+def draw_background(window, offset_y, block_size):
+    # Convert offset_y to height in blocks (offset_y is negative when climbing)
+    height_blocks = -offset_y // block_size
 
-    #Setting x and y axis with the tiles
-    for i in range(WIDTH // width + 1):
-        for j in range(HEIGHT // height + 1):
-            pos = (i * width, j * height)
-            tiles.append(pos)
-    return tiles, image
+    # Define zones as (min_height, max_height, top_color, bottom_color)
+    zones = [
+        (0,   20,  (135, 206, 135), (135, 206, 235)),  # ground: green to sky blue
+        (20,  40,  (100, 160, 220), (135, 206, 235)),  # city: deeper blue
+        (40,  60,  (80,  140, 210), (100, 160, 220)),  # clouds: lighter blue
+        (60,  80,  (60,  100, 180), (80,  140, 210)),  # planes: medium blue
+        (80,  100, (30,  60,  130), (60,  100, 180)),  # high sky: dark blue
+        (100, 120, (10,  20,  60),  (30,  60,  130)),  # twilight: very dark
+        (120, 150, (5,   5,   20),  (10,  20,  60)),   # space: near black
+    ]
 
-def draw(window, background, bg_image, player, objects, offset_x, offset_y, health, height_tracker):
-    for tile in background:
-        window.blit(bg_image, tile)
-    
+    # Find current zone and blend colors
+    top_color = (5, 5, 20)
+    bottom_color = (5, 5, 20)
+    for (min_h, max_h, tc, bc) in zones:
+        if min_h <= height_blocks < max_h:
+            # How far through this zone are we (0.0 to 1.0)
+            progress = (height_blocks - min_h) / (max_h - min_h)
+            # Blend toward next zone colors
+            top_color = tc
+            bottom_color = bc
+            break
+
+    # Draw gradient
+    for y in range(HEIGHT):
+        t = y / HEIGHT
+        r = int(top_color[0] + (bottom_color[0] - top_color[0]) * t)
+        g = int(top_color[1] + (bottom_color[1] - top_color[1]) * t)
+        b = int(top_color[2] + (bottom_color[2] - top_color[2]) * t)
+        pygame.draw.line(window, (r, g, b), (0, y), (WIDTH, y))
+
+def draw(window, player, objects, offset_x, offset_y, health, height_tracker, stars):
+    height_blocks = -offset_y // 96
+    draw_background(window, offset_y, 96)
+    draw_stars(window, stars, offset_y, height_blocks)
     for obj in objects:
         obj.draw(window, offset_x, offset_y)
     player.draw(window, offset_x, offset_y)
     health.draw(window)
     height_tracker.draw(window)
-
     pygame.display.update()
 
 #Handling vertical collision
@@ -390,7 +412,7 @@ def generate_next_platform(block_size, current_height, screen_width_blocks, last
             new_blocks.append(Block(block_size * (start + j), HEIGHT - block_size * current_height, block_size))
 
     # Fire check
-    if len(new_blocks) >= 3 and random.random() < 0.2:
+    if len(new_blocks) >= 2 and random.random() < 0.4:
         middle_block = new_blocks[len(new_blocks) // 2]
         
         # Check no block exists directly above the fire position
@@ -408,9 +430,30 @@ def generate_next_platform(block_size, current_height, screen_width_blocks, last
 
     return new_blocks
 
+#Stars
+def draw_stars(window, stars, offset_y, height_blocks):
+    if height_blocks < 80:
+        return
+
+    opacity = min(1.0, (height_blocks - 80) / 40)
+    tick = pygame.time.get_ticks()
+
+    for (x, base_y, size, twinkle) in stars:
+        # Parallax: stars move down slowly as offset_y goes more negative
+        # Multiply by small factor so they don't move 1:1 with the world
+        screen_y = base_y + (offset_y * 0.05)  # 0.05 = slow subtle drift downward
+        screen_y = screen_y % HEIGHT  # wrap around screen so stars always visible
+
+        brightness = int(180 + 75 * math.sin(tick / 500 + twinkle * 10))
+        brightness = int(brightness * opacity)
+        brightness = max(0, min(255, brightness))
+        r = brightness
+        g = brightness
+        b = int(brightness * 0.4)
+        pygame.draw.circle(window, (r, g, b), (x, int(screen_y)), size)
+
 def main(window, height_tracker=None):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("Blue.png") #Can change the bg
     block_size = 96
 
     if height_tracker is None:
@@ -421,10 +464,52 @@ def main(window, height_tracker=None):
     player = Player(WIDTH // 2 - 25, HEIGHT - block_size - 64, 50, 50) #Starting position
     health = Health()
 
+    # Generate stars spread across the climbing range
+    stars = [(random.randint(0, WIDTH), random.randint(0, HEIGHT),
+          random.randint(1, 2), random.random()) for _ in range(200)]
+    
+    preset_platforms = [
+        Block(block_size * 3, HEIGHT - block_size * 3, block_size),
+        Block(block_size * 7, HEIGHT - block_size * 3, block_size),
+        Block(block_size * 5, HEIGHT - block_size * 5, block_size),
+        Block(block_size * 6, HEIGHT - block_size * 5, block_size),
+        Block(block_size * 4, HEIGHT - block_size * 5, block_size),
+        Block(block_size * 3, HEIGHT - block_size * 5, block_size),
+        Block(block_size * 7, HEIGHT - block_size * 5, block_size),
+        Block(block_size * 9, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 10, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 11, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 12, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 1, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 0, HEIGHT - block_size * 7, block_size),
+        Block(block_size * -1, HEIGHT - block_size * 7, block_size),
+        Block(block_size * -2, HEIGHT - block_size * 7, block_size),
+        Block(block_size * 5, HEIGHT - block_size * 9, block_size),
+        Block(block_size * 1, HEIGHT - block_size * 11, block_size),
+        Block(block_size * 0, HEIGHT - block_size * 11, block_size),
+        Block(block_size * -1, HEIGHT - block_size * 11, block_size),
+        Block(block_size * 9, HEIGHT - block_size * 11, block_size),
+        Block(block_size * 10, HEIGHT - block_size * 11, block_size),
+        Block(block_size * 11, HEIGHT - block_size * 11, block_size),
+        Block(block_size * 5, HEIGHT - block_size * 14, block_size),
+        Block(block_size * 4, HEIGHT - block_size * 14, block_size),
+        Block(block_size * 6, HEIGHT - block_size * 14, block_size),
+        Block(block_size * 3, HEIGHT - block_size * 13, block_size),
+        Block(block_size * 7, HEIGHT - block_size * 13, block_size),
+        Block(block_size * -2, HEIGHT - block_size * 3, block_size),
+        Block(block_size * -3, HEIGHT - block_size * 3, block_size),
+        Block(block_size * -4, HEIGHT - block_size * 4, block_size),
+        Block(block_size * -5, HEIGHT - block_size * 4, block_size),
+        Block(block_size * 12, HEIGHT - block_size * 3, block_size),
+        Block(block_size * 13, HEIGHT - block_size * 3, block_size),
+        Block(block_size * 14, HEIGHT - block_size * 4, block_size),
+        Block(block_size * 15, HEIGHT - block_size * 4, block_size),
+    ]
+
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH * 2 // block_size)]
     platforms = []
-    generated_height = 3
-    objects = [*floor]
+    generated_height = 16  # start generating above my designed blocks
+    objects = [*floor, *preset_platforms]
 
     offset_x = 0
     offset_y = 0
@@ -457,7 +542,7 @@ def main(window, height_tracker=None):
         player.loop(FPS)
         handle_move(player, objects, health)
         height_tracker.update(player.rect.y, block_size)
-        draw(window, background, bg_image, player, objects, offset_x, offset_y, health, height_tracker)
+        draw(window, player, objects, offset_x, offset_y, health, height_tracker, stars)
 
         #Defining background movement horizontal
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
